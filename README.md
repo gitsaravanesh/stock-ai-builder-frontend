@@ -1,0 +1,155 @@
+# Stock-AI Web Dashboard
+
+Static frontend for the Stock-AI recovery analysis dashboard. It is deployed to the S3 bucket `stock-ai-s3-web-page` in `us-east-1` by GitHub Actions.
+
+## Repository layout
+
+```text
+stock-ai-web-ui/
+├── .github/workflows/deploy.yml  # GitHub Actions → AWS S3 deployment
+├── site/
+│   ├── index.html                # Dashboard application
+│   └── assets/dashboard-preview.png
+└── README.md
+```
+
+## Dashboard behaviour
+
+- **Before 4:00 PM IST:** today's prediction view is the primary view.
+- **At/after 4:00 PM IST:** today's prediction review becomes the primary view.
+- **Next Trading Day:** static `Coming soon` placeholder. It does not request a watchlist object.
+- **Refreshed Predictions (7 AM):** static `Coming soon` placeholder until its future Lambda is available.
+- The currently integrated data files are `stock_ai_report.json` and `evaluation.json` from the existing results bucket `saravanesh-stock-ai-results`.
+- The dashboard uses the exact current IST date. It does not silently substitute a previous trading day's report.
+
+## 1. Create/configure the website bucket
+
+The bucket must be in `us-east-1` and have static website hosting enabled. Run from an AWS CLI profile with permission to configure the bucket:
+
+```bash
+aws s3api put-bucket-website \
+  --bucket stock-ai-s3-web-page \
+  --website-configuration '{"IndexDocument":{"Suffix":"index.html"},"ErrorDocument":{"Key":"index.html"}}' \
+  --region us-east-1
+```
+
+For direct S3 website endpoint access, the site objects must be publicly readable. If using this approach, turn off **Block all public access** for this website bucket, then apply this bucket policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicReadWebsiteFiles",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::stock-ai-s3-web-page/*"
+    }
+  ]
+}
+```
+
+Keep public access blocked if you put CloudFront in front of a private S3 origin using Origin Access Control (recommended for HTTPS and production use). The S3 website endpoint itself supports HTTP only.
+
+## 2. Create an IAM role for GitHub Actions (OIDC)
+
+Use GitHub OIDC instead of storing AWS access keys in GitHub.
+
+### GitHub OIDC provider
+
+In IAM, create an OpenID Connect identity provider if one does not already exist:
+
+- Provider URL: `https://token.actions.githubusercontent.com`
+- Audience: `sts.amazonaws.com`
+
+### Role trust policy
+
+Create an IAM role for web identity and use this trust policy. Replace `YOUR_GITHUB_ORG` and `YOUR_REPOSITORY` with the actual GitHub owner/org and repository name.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::017118229810:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:YOUR_GITHUB_ORG/YOUR_REPOSITORY:ref:refs/heads/main"
+        }
+      }
+    }
+  ]
+}
+```
+
+### Role permissions policy
+
+Attach this inline policy to the role. It allows deployment only to this website bucket.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListWebsiteBucket",
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket"],
+      "Resource": "arn:aws:s3:::stock-ai-s3-web-page"
+    },
+    {
+      "Sid": "ManageWebsiteObjects",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::stock-ai-s3-web-page/*"
+    }
+  ]
+}
+```
+
+Copy the role ARN after creating it.
+
+## 3. Add the GitHub secret
+
+In the GitHub repository, open **Settings → Secrets and variables → Actions → New repository secret**:
+
+- Name: `AWS_ROLE_ARN`
+- Value: the IAM role ARN created above, for example `arn:aws:iam::017118229810:role/GitHubActionsStockAIWebDeploy` (use your actual role ARN).
+
+No AWS access key or secret access key is needed.
+
+## 4. Deploy
+
+1. Push this repository to GitHub, using `main` as the default branch.
+2. Add the `AWS_ROLE_ARN` repository secret.
+3. Push a change under `site/`, or manually run **Actions → Deploy Stock-AI UI to S3 → Run workflow**.
+4. Check the workflow run. It syncs `site/` to the bucket root and removes deleted site files (`--delete`).
+
+The website endpoint is:
+
+```text
+http://stock-ai-s3-web-page.s3-website-us-east-1.amazonaws.com
+```
+
+## 5. Allow the browser to read the existing results bucket
+
+The dashboard fetches JSON from `saravanesh-stock-ai-results`. For browser requests from the website origin to succeed, that results bucket must allow the website origin in its S3 CORS configuration. Add the exact website origin (and any CloudFront domain if used) to the CORS `AllowedOrigins`, with `GET` and `HEAD` methods and the required response headers. The result objects must also be readable by the browser, either through a suitable public-read design or a secured API/CloudFront approach. Do not make private stock data public unintentionally.
+
+## Local preview
+
+From the repository root:
+
+```bash
+python -m http.server 8000 --directory site
+```
+
+Open `http://localhost:8000`.
+
+## Important
+
+This is an experimental market-research dashboard, not investment advice. Keep the website bucket separate from the private results/data bucket. Do not commit AWS credentials, private market data, or secrets to this repository.

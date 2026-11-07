@@ -1,0 +1,44 @@
+name: Deploy Stock-AI UI to S3
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: stock-ai-ui-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Sync static site to S3
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (GitHub OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Validate site entry point
+        run: test -f site/index.html
+
+      - name: Deploy website
+        run: |
+          aws s3 sync site/ s3://stock-ai-s3-web-page/ \
+            --delete \
+            --only-show-errors \
+            --cache-control 'public,max-age=300'
+
+      - name: Verify deployment
+        run: aws s3 ls s3://stock-ai-s3-web-page/ --recursive
