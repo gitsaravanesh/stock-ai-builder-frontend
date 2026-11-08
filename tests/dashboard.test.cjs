@@ -96,6 +96,25 @@ test("handles no reports and rejects invalid or future dates", async () => {
   assert.equal(app.element("globalMessage").textContent, "No report found on or before today.");
 });
 
+test("shows actual close, predicted direction, and direction result", async () => {
+  const app = dashboard(async url => url.includes("list-type=2")
+    ? response({ keys: ["2026/11/09/stock_ai_report.json", "2026/11/09/evaluation.json"] })
+    : url.includes("evaluation.json")
+      ? response({ results: [
+          { ticker: "ABC", predicted_direction: "UP", actual_close: 512.5, direction_correct: true },
+          { ticker: "XYZ", predicted_direction: "DOWN", actual_close: 88, direction_correct: false }
+        ] })
+      : response({ stocks: [{ ticker: "ABC" }] }));
+  await app.load();
+  const table = app.element("reviewTable").innerHTML;
+  assert.match(table, /Predicted direction/);
+  assert.match(table, /Actual close/);
+  assert.match(table, /UP/);
+  assert.match(table, /512\.50/);
+  assert.match(table, /Correct/);
+  assert.match(table, /Incorrect/);
+});
+
 test("shows permission errors instead of treating them as missing reports", async () => {
   const app = dashboard(async () => response({}, 403));
   await app.load();
