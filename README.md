@@ -19,8 +19,8 @@ stock-ai-web-ui/
 - **At/after 4:00 PM IST:** today's prediction review becomes the primary view.
 - **Next Trading Day:** static `Coming soon` placeholder. It does not request a watchlist object.
 - **Refreshed Predictions (7 AM):** static `Coming soon` placeholder until its future Lambda is available.
-- The currently integrated data files are `stock_ai_report.json` and `evaluation.json` from the existing results bucket `saravanesh-stock-ai-results`.
-- The dashboard uses the exact current IST date. It does not silently substitute a previous trading day's report.
+- The dashboard selects the newest `stock_ai_report.json` dated on or before today in IST and clearly displays its session date when it is not today. It reads `evaluation.json` and `stock_analysis_dataset.json` from that same date when present; it does not mix dates.
+- Finding the latest report requires listing the results bucket. Missing reports are different from access, CORS, network, or invalid-data errors, which are shown on the dashboard.
 
 ## 1. Create/configure the website bucket
 
@@ -138,7 +138,51 @@ http://stock-ai-s3-web-page.s3-website-us-east-1.amazonaws.com
 
 ## 5. Allow the browser to read the existing results bucket
 
-The dashboard fetches JSON from `saravanesh-stock-ai-results`. For browser requests from the website origin to succeed, that results bucket must allow the website origin in its S3 CORS configuration. Add the exact website origin (and any CloudFront domain if used) to the CORS `AllowedOrigins`, with `GET` and `HEAD` methods and the required response headers. The result objects must also be readable by the browser, either through a suitable public-read design or a secured API/CloudFront approach. Do not make private stock data public unintentionally.
+The dashboard lists and fetches JSON from `saravanesh-stock-ai-results`. The public S3 setup below exposes **all object names** in that bucket and allows anyone to read the three named JSON files. Use it only when that exposure is acceptable; otherwise use a secured API or a separately maintained public manifest instead.
+
+Add these statements to the existing results bucket policy (retain any other statements you need). Public bucket policies also require appropriate bucket- and account-level Block Public Access settings.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicListResults",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::saravanesh-stock-ai-results"
+    },
+    {
+      "Sid": "PublicReadDashboardJson",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": [
+        "arn:aws:s3:::saravanesh-stock-ai-results/*/*/*/stock_ai_report.json",
+        "arn:aws:s3:::saravanesh-stock-ai-results/*/*/*/evaluation.json",
+        "arn:aws:s3:::saravanesh-stock-ai-results/*/*/*/stock_analysis_dataset.json"
+      ]
+    }
+  ]
+}
+```
+
+In the results bucket's CORS configuration, allow the actual website origin, for example:
+
+```json
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedOrigins": ["http://stock-ai-s3-web-page.s3-website-us-east-1.amazonaws.com"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3000
+  }
+]
+```
+
+Add any other origins you actually use, such as a CloudFront or local-preview URL.
 
 ## Local preview
 
