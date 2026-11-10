@@ -70,7 +70,7 @@ test("uses latest report across listing pages and loads review from the same dat
   assert.match(app.element("dataNoticeTitle").textContent, /6 November 2026/);
   assert.equal(app.element("heroTitle").textContent, "Latest prediction");
   assert.match(app.element("reviewMeta").textContent, /8 November 2026/);
-  assert.match(app.element("reviewTitle").textContent, /Previous day's/);
+  assert.match(app.element("reviewTitle").textContent, /Latest prediction performance/);
   assert.equal(requests.filter(url => url.includes("continuation-token=")).length, 1);
   assert.ok(requests.filter(url => url.includes("stock_ai_report.json")).every(url => url.includes("/2026/11/06/")));
   assert.ok(requests.some(url => url.includes("/2026/11/08/evaluation.json")));
@@ -134,7 +134,7 @@ test("keeps today's evaluation hidden until the 4:00 PM close", async () => {
   assert.ok(requests.some(url => url.includes("/2026/11/08/evaluation.json")));
   assert.ok(!requests.some(url => url.includes("/2026/11/09/evaluation.json")));
   assert.equal(app.element("heroTitle").textContent, "Today's prediction");
-  assert.match(app.element("reviewMeta").textContent, /Previous session: Sunday, 8 November 2026/);
+  assert.match(app.element("reviewMeta").textContent, /Review date: Sunday, 8 November 2026/);
   assert.match(app.element("reviewTable").innerHTML, /OLD/);
 });
 
@@ -157,12 +157,13 @@ test("shows today's evaluation from the 4:00 PM close", async () => {
   assert.match(app.element("reviewTable").innerHTML, /NEW/);
 });
 
-test("marks evaluation error rows instead of blank columns", async () => {
+test("marks failed rows within a partly valid evaluation", async () => {
   const app = dashboard(async url => url.includes("list-type=2")
     ? response({ keys: ["2026/11/09/stock_ai_report.json", "2026/11/09/evaluation.json"] })
     : url.includes("evaluation.json")
       ? response({ stocks_evaluated: 0, direction_accuracy_percent: 0, results: [
-          { ticker: "BAJFINANCE.NS", company: "Bajaj Finance Limited", status: "ERROR", error: "Could not get actual close for 2026-11-10" }
+          { ticker: "BAJFINANCE.NS", company: "Bajaj Finance Limited", status: "ERROR", error: "Could not get actual close for 2026-11-10" },
+          { ticker: "INFY.NS", predicted_direction: "UP", actual_close: 1500, direction_correct: true }
         ] })
       : response({ stocks: [{ ticker: "ABC" }] }));
   app.context.istParts = () => ({ year: 2026, month: 11, day: 9, hour: 16, minute: 0, second: 0, minutes: 960 });
@@ -171,7 +172,28 @@ test("marks evaluation error rows instead of blank columns", async () => {
   assert.match(table, /BAJFINANCE\.NS/);
   assert.match(table, /Error/);
   assert.match(table, /Could not get actual close/);
-  assert.match(app.element("reviewKpis").innerHTML, /1 of 1 failed/);
+  assert.match(app.element("reviewKpis").innerHTML, /1 of 2 failed/);
+});
+
+test("falls back to the latest evaluation with valid results and shows its date", async () => {
+  const requests = [];
+  const app = dashboard(async url => {
+    requests.push(url);
+    if (url.includes("list-type=2")) return response({ keys: [
+      "2026/11/09/stock_ai_report.json", "2026/11/05/evaluation.json", "2026/11/06/evaluation.json", "2026/11/09/evaluation.json"
+    ] });
+    if (url.includes("/2026/11/09/evaluation.json")) return response({ results: [{ ticker: "BAD", status: "ERROR", error: "no close" }] });
+    if (url.includes("/2026/11/06/evaluation.json")) return response({ results: [{ ticker: "GOOD", predicted_direction: "UP", actual_close: 10, direction_correct: true }] });
+    return response({ stocks: [{ ticker: "ABC" }] });
+  });
+  app.context.istParts = () => ({ year: 2026, month: 11, day: 9, hour: 16, minute: 0, second: 0, minutes: 960 });
+  await app.load();
+  assert.match(app.element("reviewTable").innerHTML, /GOOD/);
+  assert.doesNotMatch(app.element("reviewTable").innerHTML, /BAD/);
+  assert.match(app.element("reviewMeta").textContent, /Review date: Friday, 6 November 2026/);
+  assert.match(app.element("reviewMeta").textContent, /9 November 2026 had no valid results/);
+  assert.match(app.element("reviewKpis").innerHTML, /Review date/);
+  assert.ok(!requests.some(url => url.includes("/2026/11/05/evaluation.json")));
 });
 
 test("shows permission errors instead of treating them as missing reports", async () => {

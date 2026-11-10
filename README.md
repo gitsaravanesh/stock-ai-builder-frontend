@@ -15,10 +15,9 @@ stock-ai-web-ui/
 
 ## Dashboard behaviour
 
-- **Before 4:00 PM IST:** the Review tab shows the latest evaluation dated before today and labels that previous session. Today's review is not shown until the close.
-- **At/after 4:00 PM IST:** the Review tab shows today's evaluation when it has been published. If it has not, it says so and shows the latest earlier evaluation.
+- **Review tab:** shows the newest `evaluation.json` that contains at least one non-error result, checking dates newest-first (up to 14). Before 4:00 PM IST only dates before today are considered; from 4:00 PM IST today is included. The review date is always displayed, and a note appears when a newer evaluation was skipped because it had no valid results.
 - **Next Trading Day:** static `Coming soon` placeholder. It does not request a watchlist object.
-- The dashboard selects the newest `stock_ai_report.json` dated on or before today in IST and clearly displays its session date when it is not today. `stock_analysis_dataset.json` stays with that prediction date. `evaluation.json` follows the review-date rule above, so its date can differ from the prediction date.
+- The dashboard selects the newest `stock_ai_report.json` dated on or before today in IST and clearly displays its session date when it is not today. `stock_analysis_dataset.json` stays with that prediction date. `evaluation.json` follows the Review tab rule above, so its date can differ from the prediction date.
 - Finding the latest report requires listing the results bucket. Missing reports are different from access, CORS, network, or invalid-data errors, which are shown on the dashboard.
 
 ## 1. Create/configure the website bucket
