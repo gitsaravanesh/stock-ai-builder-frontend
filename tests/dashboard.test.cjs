@@ -157,6 +157,23 @@ test("shows today's evaluation from the 4:00 PM close", async () => {
   assert.match(app.element("reviewTable").innerHTML, /NEW/);
 });
 
+test("marks evaluation error rows instead of blank columns", async () => {
+  const app = dashboard(async url => url.includes("list-type=2")
+    ? response({ keys: ["2026/11/09/stock_ai_report.json", "2026/11/09/evaluation.json"] })
+    : url.includes("evaluation.json")
+      ? response({ stocks_evaluated: 0, direction_accuracy_percent: 0, results: [
+          { ticker: "BAJFINANCE.NS", company: "Bajaj Finance Limited", status: "ERROR", error: "Could not get actual close for 2026-11-10" }
+        ] })
+      : response({ stocks: [{ ticker: "ABC" }] }));
+  app.context.istParts = () => ({ year: 2026, month: 11, day: 9, hour: 16, minute: 0, second: 0, minutes: 960 });
+  await app.load();
+  const table = app.element("reviewTable").innerHTML;
+  assert.match(table, /BAJFINANCE\.NS/);
+  assert.match(table, /Error/);
+  assert.match(table, /Could not get actual close/);
+  assert.match(app.element("reviewKpis").innerHTML, /1 of 1 failed/);
+});
+
 test("shows permission errors instead of treating them as missing reports", async () => {
   const app = dashboard(async () => response({}, 403));
   await app.load();
