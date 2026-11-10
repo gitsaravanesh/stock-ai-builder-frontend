@@ -196,6 +196,29 @@ test("falls back to the latest evaluation with valid results and shows its date"
   assert.ok(!requests.some(url => url.includes("/2026/11/05/evaluation.json")));
 });
 
+test("lets the user pick a past review date", async () => {
+  const requests = [];
+  const app = dashboard(async url => {
+    requests.push(url);
+    if (url.includes("list-type=2")) return response({ keys: [
+      "2026/11/09/stock_ai_report.json", "2026/11/05/evaluation.json", "2026/11/06/evaluation.json"
+    ] });
+    if (url.includes("/2026/11/05/evaluation.json")) return response({ results: [{ ticker: "OLDPICK", predicted_direction: "DOWN", actual_close: 7, direction_correct: false }] });
+    if (url.includes("/2026/11/06/evaluation.json")) return response({ results: [{ ticker: "LATEST", predicted_direction: "UP", actual_close: 9, direction_correct: true }] });
+    return response({ stocks: [{ ticker: "ABC" }] });
+  });
+  app.context.istParts = () => ({ year: 2026, month: 11, day: 9, hour: 16, minute: 0, second: 0, minutes: 960 });
+  await app.load();
+  assert.match(app.element("reviewTable").innerHTML, /LATEST/);
+  assert.match(app.element("reviewDateSelect").innerHTML, /5 November 2026/);
+  assert.match(app.element("reviewDateSelect").innerHTML, /6 November 2026/);
+  vm.runInContext('reviewChoice = "2026-11-05"', app.context);
+  await app.load();
+  assert.match(app.element("reviewTable").innerHTML, /OLDPICK/);
+  assert.match(app.element("reviewMeta").textContent, /5 November 2026 \(selected\)/);
+  assert.equal(app.element("reviewDateSelect").value, "2026-11-05");
+});
+
 test("shows permission errors instead of treating them as missing reports", async () => {
   const app = dashboard(async () => response({}, 403));
   await app.load();
