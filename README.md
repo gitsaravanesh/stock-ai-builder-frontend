@@ -18,7 +18,6 @@ stock-ai-web-ui/
 - **Before 4:00 PM IST:** today's prediction view is the primary view.
 - **At/after 4:00 PM IST:** today's prediction review becomes the primary view.
 - **Next Trading Day:** static `Coming soon` placeholder. It does not request a watchlist object.
-- **Refreshed Predictions (7 AM):** static `Coming soon` placeholder until its future Lambda is available.
 - The dashboard selects the newest `stock_ai_report.json` dated on or before today in IST and clearly displays its session date when it is not today. It reads `evaluation.json` and `stock_analysis_dataset.json` from that same date when present; it does not mix dates.
 - Finding the latest report requires listing the results bucket. Missing reports are different from access, CORS, network, or invalid-data errors, which are shown on the dashboard.
 

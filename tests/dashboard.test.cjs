@@ -16,7 +16,7 @@ function dashboard(fetch) {
     });
     return elements.get(id);
   }
-  const tabs = ["today", "review", "watchlist", "refresh"].map(tab => ({
+  const tabs = ["today", "review", "watchlist"].map(tab => ({
     dataset: { tab }, classList: { toggle() {} }, addEventListener() {}
   }));
   const document = {
