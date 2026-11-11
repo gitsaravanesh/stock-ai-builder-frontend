@@ -104,7 +104,7 @@ test("shows actual close, predicted direction, and direction result", async () =
     ? response({ keys: ["2026/11/09/stock_ai_report.json", "2026/11/09/evaluation.json"] })
     : url.includes("evaluation.json")
       ? response({ results: [
-          { ticker: "ABC", predicted_direction: "UP", actual_close: 512.5, direction_correct: true },
+          { ticker: "ABC", predicted_direction: "UP", predicted_change: 1.25, actual_close: 512.5, actual_change: 0.8, direction_correct: true },
           { ticker: "XYZ", predicted_direction: "DOWN", actual_close: 88, direction_correct: false }
         ] })
       : response({ stocks: [{ ticker: "ABC" }] }));
@@ -113,6 +113,10 @@ test("shows actual close, predicted direction, and direction result", async () =
   const table = app.element("reviewTable").innerHTML;
   assert.match(table, /Predicted direction/);
   assert.match(table, /Actual close/);
+  assert.match(table, /Predicted change/);
+  assert.match(table, /Actual change/);
+  assert.match(table, /1\.25/);
+  assert.match(table, /0\.80/);
   assert.match(table, /UP/);
   assert.match(table, /512\.50/);
   assert.match(table, /Correct/);
