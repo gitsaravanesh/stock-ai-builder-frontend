@@ -111,6 +111,8 @@ test("shows actual close, predicted direction, and direction result", async () =
   app.context.istParts = () => ({ year: 2026, month: 11, day: 9, hour: 16, minute: 0, second: 0, minutes: 960 });
   await app.load();
   const table = app.element("reviewTable").innerHTML;
+  assert.match(table, /<th>Ticker<\/th><th class="num">Actual close<\/th><th class="num">Predicted change<\/th><th class="num">Actual change<\/th><th>Predicted direction<\/th><th>Direction<\/th>/);
+  assert.match(table, /<td>ABC<\/td><td class="num">512\.50<\/td><td class="num">1\.25<\/td><td class="num">0\.80<\/td><td>UP<\/td>/);
   assert.match(table, /Predicted direction/);
   assert.match(table, /Actual close/);
   assert.match(table, /Predicted change/);
