@@ -104,7 +104,7 @@ test("shows actual close, predicted direction, and direction result", async () =
     ? response({ keys: ["2026/11/09/stock_ai_report.json", "2026/11/09/evaluation.json"] })
     : url.includes("evaluation.json")
       ? response({ results: [
-          { ticker: "ABC", predicted_direction: "UP", predicted_change: 1.25, actual_close: 512.5, actual_change: 0.8, direction_correct: true },
+          { ticker: "ABC", predicted_direction: "UP", expected_move_percent: 1.25, actual_close: 512.5, actual_return_percent: 0.8, direction_correct: true },
           { ticker: "XYZ", predicted_direction: "DOWN", actual_close: 88, direction_correct: false }
         ] })
       : response({ stocks: [{ ticker: "ABC" }] }));
@@ -112,13 +112,13 @@ test("shows actual close, predicted direction, and direction result", async () =
   await app.load();
   const table = app.element("reviewTable").innerHTML;
   assert.match(table, /<th>Ticker<\/th><th class="num">Actual close<\/th><th class="num">Predicted change<\/th><th class="num">Actual change<\/th><th>Predicted direction<\/th><th>Direction<\/th>/);
-  assert.match(table, /<td>ABC<\/td><td class="num">512\.50<\/td><td class="num">1\.25<\/td><td class="num">0\.80<\/td><td>UP<\/td>/);
+  assert.match(table, /<td>ABC<\/td><td class="num">512\.50<\/td><td class="num">1\.25%<\/td><td class="num">0\.80%<\/td><td>UP<\/td>/);
   assert.match(table, /Predicted direction/);
   assert.match(table, /Actual close/);
   assert.match(table, /Predicted change/);
   assert.match(table, /Actual change/);
-  assert.match(table, /1\.25/);
-  assert.match(table, /0\.80/);
+  assert.match(table, /1\.25%/);
+  assert.match(table, /0\.80%/);
   assert.match(table, /UP/);
   assert.match(table, /512\.50/);
   assert.match(table, /Correct/);
